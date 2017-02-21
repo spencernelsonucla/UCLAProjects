@@ -1,0 +1,294 @@
+---
+title: "Stats 102A Function Writing"
+author: "Spencer J. Nelson"
+date: "December 10, 2015"
+output: pdf_document
+---
+
+1) Implement the Nelder-Mead Algorithm for optimization in two dimensions.
+
+Optimize the following function two-dimensional function.
+
+$$f(x1, x2) = ((x_1 - x_2)^2 + (x_1 - 2)^2 + (x_2 - 3)^4) / 10$$
+
+Your function should perform one iteration of the Nelder-Mead Algorithm. That is, take the three points, evaluate them, run through the algorithm, select the next candidate point return the chosen set of three points (3 x 2 matrix).
+
+
+```{r}
+nm_iterate <- function(x, f) {
+	n <- nrow(x)
+	p <- ncol(x)
+	
+	if (n != p + 1) stop(paste('Need', p + 1, 'starting points'))
+	
+	fx <- rep(NA, n)
+	for (i in 1:n) fx[i] <- f(x[i,1],x[i,2])
+	
+	o <- order(fx)
+	fx <- fx[o]
+	x <- x[o,]
+	xmid <- apply(x[1:p,], 2, mean)
+	z1 <- xmid - (x[n,] - xmid)
+	fz1 <- f(z1[1], z1[2])
+	
+	if (fz1 < fx[1]) {
+		z2 <- xmid - 2*(x[n,] - xmid)
+		fz2 <- f(z2[1],z2[2])
+		if (fz2 < fz1) {
+			cat('Accepted reflection and expansion, f(z2)=',fz2,'\n')
+			x[n,] <- z2
+		} else {
+			cat('Accepted good reflection, f(z1)=',fz1,'\n')
+			x[n,] <- z1
+		}
+	} else if (fz1 < fx[p]) {
+		cat('Accepted okay reflection, f(z1)=',fz1,'\n')
+		x[n,] <- z1
+	} else {
+		if (fz1 < fx[n]) {
+			x[n,] <- z1
+			fx[n] <- fz1
+		}
+		z3 <- xmid + (x[n,] - xmid)/2
+		fz3 <- f(z3[1],z3[2])
+		if (fz3 < fx[n]) {
+			cat('Accepted contraction 1, f(z3)=',fz3,'\n')
+			x[n,] <- z3
+		} else {
+			cat('Accepted contraction 2,')
+			for (i in 2:n) {
+				x[i,] <- x[1,] + (x[i,] - x[1,])/2
+				cat(' f(z', i+2, ') = ', f(x[i,1],x[i,2]), sep='')
+			}
+			cat('\n')
+		}
+	}
+	return(x)
+}
+
+
+```
+
+
+
+```{r}
+# no need to modify this code. This code takes the function you wrote and runs 12 iterations. 
+f <- function(x1, x2) {((x1 - x2)^2 + (x1 - 2)^2 + (x2 - 3)^4) / 10}
+
+x1 <- seq(0, 5, len=20)
+x2 <- seq(0, 5, len=20)
+z <- outer(x1, x2, f)
+contour(x1, x2, z)
+
+x <- c(
+    0, 0,
+    0, 1,
+    1, 0
+)
+x <- matrix(x, nrow = 3, byrow = TRUE)
+
+for(i in 1:12){
+    segments(x[1,1],x[1,2],x[2,1],x[2,2])
+    segments(x[1,1],x[1,2],x[3,1],x[3,2])
+    segments(x[2,1],x[2,2],x[3,1],x[3,2])
+    x <- nm_iterate(x,f)
+}
+points(2.25, 2.5, col = 'red', pch = 19)
+# the points in x should be close to the true minimum of 2.25, 2.5
+x
+```
+
+2) Bisection method for root-finding of a univariate function. 
+
+Let's say you are trying to estimate the probability that an unfair coin lands on Heads. You have flipped the coin 30 times, and it has landed on heads 21 times.
+
+The likelihood of the data as a function of p, the probability of landing heads is:
+
+$$L(p) = p^{21} (1 - p)^{9}$$
+
+Find the maximum likelihood estimate of p, by maximizing the likelihood function. To do so, find the root of the derivative of the function via the bisection method.
+
+$$L'(p) = -3 (1-p)^8 p^{20} (10 p-7)$$
+
+Start on the interval 0.5 to 0.95. Use a tolerance of 1e-9 as your convergence criterion. (Stop when the difference between the left and right bound of the interval is 1e-9 or less.) **Print out the midpoint of the interval as your solution.** (The true answer is p = 0.7, and your solution should converge after about 10 iterations.)
+
+
+```{r}
+fn <- function(p){
+    -3*(1 - p)^8 * p^20 * (10*p - 7)
+    }
+
+lo <- 0.5
+hi <- 0.95
+
+bisect <- function(fn, lo, hi, tol = 1e-9) { 
+
+    flo <- fn(lo) 
+    fhi <- fn(hi) 
+
+    if(flo - fhi <= 1e-9) 
+        stop("root is not between lo and hi") 
+
+    mid <- (lo + hi) / 2 
+    fmid <- fn(mid) 
+    if(abs(fmid) <= tol || abs(hi-lo) <= tol) 
+        return(mid) 
+
+
+    if(fmid * fhi > 0) 
+        return(bisect(fn, lo, mid, tol)) 
+
+    return(bisect(fn, mid, hi, tol)) 
+} 
+
+
+bisect(fn, .5, .95) 
+  
+```
+
+
+3) Nonparametric Bootstrap
+
+Take the following sample and perform nonparametric bootstrap to get an estimate of the standard error of the sample mean.
+
+```{r}
+x <- c(9.42, 7.25, 4.57, 2.77, 15.15, 1.97, 3.81, 3.99, 8.08, 10.94, 17.77, 4.21, 10.78, 10.23, 4.06, 5.16, 8.4, 4.39, 3.3, 4.01, 9.14, 3.81, 4.8, 1.49, 2.65, 7.54, 4.42, 2.98, 1.95, 2.49)
+
+B <- 200 # 200 bootstrap replicates
+n <- length(x) # sample size
+R <- numeric(B) # a vector to store our results
+indices <- matrix(0,nrow = B, ncol = n)
+
+for(b in 1:B){
+    # randomly select rows with replacement
+    i <- sample(1:n, size = n, replace = TRUE)
+    R[b] <- mean(i) # mean of the selected rows.
+    indices[b, ] <- i
+}
+
+se_R <- sd(R)/sqrt(n)  # Standard Error
+
+print(se_R)
+
+
+```
+
+4) Parametric Bootstrap 
+
+For a Chi-squared distribution with 4 degrees of freedom, use parametric bootstrap to estimate the difference between the mean and median of a random sample of 100 data points.
+
+```{r}
+m = 1000
+n = 100
+
+final = rep(0,m)
+
+for (i in 1:m){
+  x = rchisq(n, df=4)
+  mean = mean(x)
+  median = median(x)
+  
+  final <- mean-median
+
+}
+
+print(final)
+```
+
+
+
+6) Simulation: The following model can be used for a basic epidemiological study of a contagion. 
+
+Suppose that there are 500 persons in a population. Some are sick with influenza. The following assumptions are made:
+
++ When a sick person meets a healthy one, the chance is p that the healthy person will be infected.
++ All encounters are between two persons.
++ All possible encounters in pairs are equally likely. One such encounter occurs in every iteration of the loop.
+
+Write some code to simulate this model for 500 people over the course of time. The loop stops when everyone is infected.
+
+Your code should return a vector of values which represents the timeline of how many people are infected. 
+
+You may treat people as interchangeable. The only value we are interested in is how many people are infected at any given time.
+
+Run the simulation for p = 0.02, 0.05, and 0.1. Plot the timeline showing the progession of infection. Report the number of iterations it took for each of these values of p.
+```{r}
+# probability of 0.02
+ni <- 1
+p = 0.02
+pop <- 500
+nu <- pop-ni
+choose(500,1)
+count = 0
+x <- (2*ni/pop)*(nu/pop)
+ts <- c(ni)
+
+while(ni<pop){
+  x <- (2*ni/pop)*(nu/pop)
+  while(runif(1)>x){
+    count = count + 1
+    ts <- c(ts,ni)
+  }
+  if(runif(1)<p){
+  ni <- ni + 1
+  nu <- nu - 1
+  
+  }
+  ts <- c(ts,ni)
+}
+plot(ts)
+length(ts)
+
+#probability of 0.05
+ni <- 1
+p = 0.06
+pop <- 500
+nu <- pop-ni
+choose(500,1)
+count = 0
+x <- (2*ni/pop)*(nu/pop)
+ts <- c(ni)
+
+while(ni<pop){
+  x <- (2*ni/pop)*(nu/pop)
+  while(runif(1)>x){
+    count = count + 1
+    ts <- c(ts,ni)
+  }
+  if(runif(1)<p){
+  ni <- ni + 1
+  nu <- nu - 1
+  
+  }
+  ts <- c(ts,ni)
+}
+plot(ts)
+length(ts)
+
+# probability of 0.1
+ni <- 1
+p = 0.1
+pop <- 500
+nu <- pop-ni
+choose(500,1)
+count = 0
+x <- (2*ni/pop)*(nu/pop)
+ts <- c(ni)
+
+while(ni<pop){
+  x <- (2*ni/pop)*(nu/pop)
+  while(runif(1)>x){
+    count = count + 1
+    ts <- c(ts,ni)
+  }
+  if(runif(1)<p){
+  ni <- ni + 1
+  nu <- nu - 1
+  
+  }
+  ts <- c(ts,ni)
+}
+plot(ts)
+length(ts)
+```
+
